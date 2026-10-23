@@ -26,6 +26,8 @@ muse-studio/outputs/**
 .cursor/
 .skills/
 .vscode/
+.idea/
+.kiro/
 
 # Logs
 *.log
