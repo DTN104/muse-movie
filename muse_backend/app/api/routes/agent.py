@@ -56,7 +56,11 @@ async def get_agent_suggestions(request: AgentSuggestionsRequest):
             },
         )
 
-    result = run_suggestion_agent(
+    # Sync LangChain call: keep it off the event loop. The claude_code/codex
+    # providers are served by this same backend, so a blocking call here would
+    # deadlock the whole server.
+    result = await asyncio.to_thread(
+        run_suggestion_agent,
         project=request.project,
         control_level=request.control_level,
         provider_id=request.provider_id,
@@ -279,7 +283,8 @@ async def orchestrate(request: OrchestrateRequest):
 
     goal = request.goal or "next_step"
     target_total = request.targetTotal if request.targetTotal is not None else None
-    state = run_supervisor(
+    state = await asyncio.to_thread(
+        run_supervisor,
         project=request.project,
         goal=goal,
         target_total=target_total,
@@ -328,7 +333,9 @@ async def run_video_editor(request: VideoEditorAgentRequest):
             detail={"error": "Video Editor Agent not available.", "reason": str(e)},
         )
 
-    result = run_video_editor_agent(project=request.project, mode=request.mode)
+    result = await asyncio.to_thread(
+        run_video_editor_agent, project=request.project, mode=request.mode
+    )
     status = result.get("status")
 
     if status == "failed":
@@ -433,7 +440,8 @@ async def get_agent_suggestions_revision(request: AgentRevisionRequest):
             detail={"error": "LangGraph agent not available.", "reason": str(e)},
         )
 
-    result = run_suggestion_revision(
+    result = await asyncio.to_thread(
+        run_suggestion_revision,
         project=request.project,
         rejected_suggestion_id=request.rejected_suggestion_id,
         feedback=request.feedback,

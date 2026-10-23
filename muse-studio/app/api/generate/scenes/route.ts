@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/db';
+import { CLI_API_KEY, CLI_PROVIDER_LABEL, cliBaseUrl, cliModelId, isCliProvider } from '@/lib/llm-cli';
 import {
   MAX_SCENE_PROMPT_CHAR_BLOCK_CHARS,
   MAX_SCENE_PROMPT_LOGLINE_CHARS,
@@ -268,6 +269,17 @@ export async function POST(req: NextRequest) {
             model: lmstudioModel,
             systemPrompt: sceneSystemPrompt,
             userMessage,
+            maxOutputTokens: openaiMaxOutput,
+            timeoutMs: openaiStreamTimeoutMs,
+          });
+        } else if (isCliProvider(provider)) {
+          generator = generateOpenAICompatText({
+            baseUrl: cliBaseUrl(),
+            apiKey: CLI_API_KEY,
+            model: cliModelId(provider, provider === 'codex' ? settings.codex_model : (settings.claude_code_model ?? 'sonnet')),
+            systemPrompt: sceneSystemPrompt,
+            userMessage,
+            providerName: CLI_PROVIDER_LABEL[provider],
             maxOutputTokens: openaiMaxOutput,
             timeoutMs: openaiStreamTimeoutMs,
           });

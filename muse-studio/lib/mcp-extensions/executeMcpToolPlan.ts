@@ -30,6 +30,7 @@ import type {
   McpToolCallLogEntry,
   McpToolCallPreview,
 } from '@/lib/mcp-extensions/mcpChatTypes';
+import { CLI_API_KEY, CLI_PROVIDER_LABEL, cliBaseUrl, cliModelId } from '@/lib/llm-cli';
 
 const MCP_CONSOLE_OUTPUT_DIR = 'drafts/mcp-extensions/global';
 const BUILTIN_MUSE_PLUGIN_ID = 'builtin.muse';
@@ -129,6 +130,17 @@ async function runBuiltInMuseTool(params: {
         systemPrompt,
         userMessage: withContext,
         providerName: 'Claude',
+      });
+      break;
+    case 'claude_code':
+    case 'codex':
+      res = await streamStoryOpenAICompat({
+        baseUrl: cliBaseUrl(),
+        apiKey: CLI_API_KEY,
+        model: cliModelId(provider, provider === 'codex' ? settings.codexModel : settings.claudeCodeModel),
+        systemPrompt,
+        userMessage: withContext,
+        providerName: CLI_PROVIDER_LABEL[provider],
       });
       break;
     case 'openrouter':

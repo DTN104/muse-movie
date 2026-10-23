@@ -2,6 +2,7 @@ import type { LLMSettings } from '@/lib/actions/settings';
 import type { McpAttachmentPayload } from '@/lib/mcp-extensions/mcpChatTypes';
 import { DEFAULT_MISSING_API_KEY_MSG } from '@/lib/generation/storyGenerationInternals';
 import { openRouterOptionalHeaders } from '@/lib/generation/openRouterHeaders';
+import { CLI_API_KEY, CLI_PROVIDER_LABEL, cliBaseUrl, cliModelId } from '@/lib/llm-cli';
 
 const ORCHESTRATION_SYSTEM = `You are the Extensions orchestrator for Muse Studio.
 You must respond with a single JSON object only (no markdown fences).
@@ -178,6 +179,13 @@ export async function completeJsonOrchestration(opts: {
       model = settings.openrouterModel;
       providerName = 'OpenRouter';
       extraHeaders = openRouterOptionalHeaders();
+      break;
+    case 'claude_code':
+    case 'codex':
+      baseUrl = cliBaseUrl();
+      apiKey = CLI_API_KEY;
+      model = cliModelId(provider, provider === 'codex' ? settings.codexModel : settings.claudeCodeModel);
+      providerName = CLI_PROVIDER_LABEL[provider];
       break;
     default:
       throw new Error(`Unsupported LLM provider for Extensions orchestration: "${provider}".`);

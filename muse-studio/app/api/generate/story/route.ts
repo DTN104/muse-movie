@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getProjectById } from '@/lib/actions/projects';
 import { getLLMSettings } from '@/lib/actions/settings';
+import { CLI_API_KEY, CLI_PROVIDER_LABEL, cliBaseUrl, cliModelId } from '@/lib/llm-cli';
 import { openRouterOptionalHeaders } from '@/lib/generation/openRouterHeaders';
 import {
   STORY_GENERATION_SYSTEM_PROMPTS,
@@ -134,6 +135,21 @@ export async function POST(req: NextRequest) {
         userMessage,
         maxTokens: max_tokens,
         temperature,
+      });
+    }
+
+    case 'claude_code':
+    case 'codex': {
+      const saved = await getLLMSettings();
+      return streamStoryOpenAICompat({
+        baseUrl: cliBaseUrl(),
+        apiKey: CLI_API_KEY,
+        model: cliModelId(provider_id, provider_id === 'codex' ? saved.codexModel : saved.claudeCodeModel),
+        systemPrompt,
+        userMessage,
+        maxTokens: max_tokens,
+        temperature,
+        providerName: CLI_PROVIDER_LABEL[provider_id],
       });
     }
 

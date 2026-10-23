@@ -14,6 +14,10 @@ function longformLlmModel(settings: LLMSettings): string | undefined {
       return settings.openrouterModel || undefined;
     case 'ollama':
       return settings.ollamaModel || undefined;
+    case 'claude_code':
+      return settings.claudeCodeModel || undefined;
+    case 'codex':
+      return settings.codexModel || undefined;
     default:
       return undefined;
   }

@@ -51,7 +51,7 @@ export async function setSettings(entries: Record<string, string>): Promise<void
 // ─── LLM settings convenience helpers ────────────────────────────────────────
 
 export interface LLMSettings {
-  llmProvider: string;    // "ollama" | "openai" | "claude" | "lmstudio" | "openrouter"
+  llmProvider: string;    // "ollama" | "openai" | "claude" | "lmstudio" | "openrouter" | "claude_code" | "codex"
   ollamaBaseUrl: string;
   ollamaModel: string;
   openaiModel: string;
@@ -62,6 +62,10 @@ export interface LLMSettings {
   openrouterModel: string;
   /** OpenAI-compatible API base; default https://openrouter.ai/api/v1 */
   openrouterBaseUrl: string;
+  /** Claude Code CLI model alias (sonnet | opus | haiku) — subscription login, no API key */
+  claudeCodeModel: string;
+  /** Codex CLI model id; empty = the CLI's own default */
+  codexModel: string;
 }
 
 export async function getLLMSettings(): Promise<LLMSettings> {
@@ -76,6 +80,8 @@ export async function getLLMSettings(): Promise<LLMSettings> {
     lmstudioModel: all['lmstudio_model'] ?? '',
     openrouterModel: all['openrouter_model'] ?? 'openai/gpt-4o-mini',
     openrouterBaseUrl: all['openrouter_base_url'] ?? 'https://openrouter.ai/api/v1',
+    claudeCodeModel: all['claude_code_model'] ?? 'sonnet',
+    codexModel: all['codex_model'] ?? '',
   };
 }
 
@@ -90,6 +96,8 @@ export async function saveLLMSettings(data: LLMSettings): Promise<void> {
     lmstudio_model: data.lmstudioModel,
     openrouter_model: data.openrouterModel,
     openrouter_base_url: data.openrouterBaseUrl,
+    claude_code_model: data.claudeCodeModel,
+    codex_model: data.codexModel,
   });
 }
 

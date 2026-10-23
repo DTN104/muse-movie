@@ -144,6 +144,22 @@ def get_chat_model(
             default_headers=default_headers or None,
         )
 
+    if pid in ("claude_code", "codex"):
+        # Subscription CLIs: served by this backend's own OpenAI-compatible façade (routes/llm_cli.py)
+        from langchain_openai import ChatOpenAI
+
+        llm_cfg = _get_llm_config()
+        cli_model = model or llm_cfg.get(f"{pid}_model") or ""
+        port = int(os.getenv("PORT") or settings.server.port)
+        return ChatOpenAI(
+            api_key="subscription-cli",
+            base_url=f"http://127.0.0.1:{port}/llm/cli/v1",
+            model=f"{pid}/{cli_model}" if cli_model else pid,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=600,
+        )
+
     raise ValueError(f"Unknown LLM provider: {pid}")
 
 
@@ -161,4 +177,8 @@ def is_provider_available(provider_id: Optional[str] = None) -> bool:
         return bool(os.getenv("LMSTUDIO_BASE_URL"))
     if pid == "openrouter":
         return bool(settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY"))
+    if pid in ("claude_code", "codex"):
+        from app.registry import LLM_PROVIDERS
+
+        return LLM_PROVIDERS[pid]().is_available()
     return False

@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { saveLLMSettings } from '@/lib/actions/settings';
+import { CLAUDE_CODE_MODELS, CLI_PROVIDER_LABEL, CODEX_MODELS, isCliProvider } from '@/lib/llm-cli';
 import type { LLMSettings as LLMSettingsData } from '@/lib/actions/settings';
 
 interface LLMModel {
@@ -74,6 +75,22 @@ const PROVIDER_OPTIONS = [
       'Many models through one OpenAI-compatible API. Set OPENROUTER_API_KEY in muse-studio/.env.local and muse_backend/.env.',
     badge: 'API Key Required',
     badgeColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+  },
+  {
+    id: 'claude_code',
+    label: 'Claude Code (subscription)',
+    description:
+      'Uses the Claude Code CLI signed in with your Claude Pro/Max account. No API key — the CLI runs locally.',
+    badge: 'Subscription',
+    badgeColor: 'text-orange-300 bg-orange-500/10 border-orange-500/20',
+  },
+  {
+    id: 'codex',
+    label: 'Codex CLI (subscription)',
+    description:
+      'Uses the Codex CLI signed in with your ChatGPT Plus/Pro account. No API key — the CLI runs locally.',
+    badge: 'Subscription',
+    badgeColor: 'text-orange-300 bg-orange-500/10 border-orange-500/20',
   },
 ];
 
@@ -162,6 +179,8 @@ export function LLMSettings({ initialSettings }: LLMSettingsProps) {
   const [openrouterBaseUrl, setOpenrouterBaseUrl] = useState(
     initialSettings.openrouterBaseUrl ?? 'https://openrouter.ai/api/v1',
   );
+  const [claudeCodeModel, setClaudeCodeModel] = useState(initialSettings.claudeCodeModel ?? 'sonnet');
+  const [codexModel, setCodexModel] = useState(initialSettings.codexModel ?? '');
 
   const [models, setModels] = useState<LLMModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -187,7 +206,9 @@ export function LLMSettings({ initialSettings }: LLMSettingsProps) {
     lmstudioUrl !== initialSettings.lmstudioBaseUrl ||
     lmstudioModel !== (initialSettings.lmstudioModel ?? 'gpt-4o-mini') ||
     openrouterModel !== (initialSettings.openrouterModel ?? 'openai/gpt-4o-mini') ||
-    openrouterBaseUrl !== (initialSettings.openrouterBaseUrl ?? 'https://openrouter.ai/api/v1');
+    openrouterBaseUrl !== (initialSettings.openrouterBaseUrl ?? 'https://openrouter.ai/api/v1') ||
+    claudeCodeModel !== (initialSettings.claudeCodeModel ?? 'sonnet') ||
+    codexModel !== (initialSettings.codexModel ?? '');
 
   // ── Load Ollama models ─────────────────────────────────────────────────────
 
@@ -285,6 +306,8 @@ export function LLMSettings({ initialSettings }: LLMSettingsProps) {
         lmstudioModel,
         openrouterModel,
         openrouterBaseUrl,
+        claudeCodeModel,
+        codexModel,
       });
 
       // Sync to backend so Video Editor Agent and other LLM consumers use the same provider
@@ -303,6 +326,10 @@ export function LLMSettings({ initialSettings }: LLMSettingsProps) {
         } else if (provider === 'openrouter') {
           body.openrouter_model = openrouterModel;
           body.openrouter_base_url = openrouterBaseUrl;
+        } else if (provider === 'claude_code') {
+          body.claude_code_model = claudeCodeModel;
+        } else if (provider === 'codex') {
+          body.codex_model = codexModel;
         }
         await fetch('/api/llm/config', {
           method: 'POST',
@@ -804,6 +831,42 @@ export function LLMSettings({ initialSettings }: LLMSettingsProps) {
           <p className="text-xs text-muted-foreground/60">
             The key is never stored in the database. Restart the backend after updating .env.
           </p>
+        </section>
+      )}
+
+      {/* ── Subscription CLI configuration (Claude Code / Codex) ───────────── */}
+      {isCliProvider(provider) && (
+        <section className="rounded-2xl border border-white/8 bg-[oklch(0.13_0.012_264)] p-5 space-y-5">
+          <h2 className="text-sm font-medium flex items-center gap-2">
+            <Brain className="h-4 w-4 text-orange-300" />
+            {CLI_PROVIDER_LABEL[provider]} Configuration
+          </h2>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Model</label>
+            <ModelPicker
+              value={provider === 'codex' ? codexModel : claudeCodeModel}
+              onChange={provider === 'codex' ? setCodexModel : setClaudeCodeModel}
+              options={provider === 'codex' ? CODEX_MODELS : CLAUDE_CODE_MODELS}
+            />
+          </div>
+
+          <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 px-4 py-3 space-y-1.5">
+            <p className="text-sm text-orange-200/80">Sign in once in a terminal, then Muse Studio reuses that login:</p>
+            <code className="mt-1 block rounded-lg bg-white/5 px-3 py-2 text-xs font-mono text-foreground/80 whitespace-pre">
+              {provider === 'codex' ? 'npm i -g @openai/codex\ncodex   # choose "Sign in with ChatGPT"' : 'npm i -g @anthropic-ai/claude-code\nclaude  # follow the login prompt'}
+            </code>
+          </div>
+
+          <div className="rounded-xl border border-white/6 bg-white/2 px-4 py-3 space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">How it works</p>
+            <p className="text-xs text-muted-foreground/70">
+              The backend runs the CLI in headless mode (<code className="font-mono bg-white/5 px-1 rounded">{provider === 'codex' ? 'codex exec' : 'claude -p'}</code>)
+              with its hooks, plugins and MCP servers disabled, and exposes it as an OpenAI-compatible endpoint.
+              Usage counts against your subscription quota; no API key or token is stored by Muse Studio.
+              {provider === 'codex' && ' Codex returns the full answer at once (no token streaming).'}
+            </p>
+          </div>
         </section>
       )}
 

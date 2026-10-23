@@ -13,6 +13,8 @@ const DEFAULT_LLM: LLMSettings = {
   lmstudioModel: '',
   openrouterModel: 'openai/gpt-4o-mini',
   openrouterBaseUrl: 'https://openrouter.ai/api/v1',
+  claudeCodeModel: 'sonnet',
+  codexModel: '',
 };
 
 export function useLLMSettings(): LLMSettings {

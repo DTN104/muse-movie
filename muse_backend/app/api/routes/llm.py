@@ -67,6 +67,8 @@ class LLMConfigUpdate(BaseModel):
     openai_model: Optional[str] = None
     claude_model: Optional[str] = None
     openrouter_model: Optional[str] = None
+    claude_code_model: Optional[str] = None
+    codex_model: Optional[str] = None
     openrouter_base_url: Optional[str] = None
 
 
@@ -182,6 +184,10 @@ async def update_llm_config(body: LLMConfigUpdate):
         cfg["llm"]["openrouter_model"] = body.openrouter_model
     if body.openrouter_base_url is not None:
         cfg["llm"]["openrouter_base_url"] = body.openrouter_base_url
+    if body.claude_code_model is not None:
+        cfg["llm"]["claude_code_model"] = body.claude_code_model
+    if body.codex_model is not None:
+        cfg["llm"]["codex_model"] = body.codex_model
     _write_config(cfg)
     settings.reload_from_file()
     logger.info("[LLM] Persisted active_provider=%s to muse_config.json", body.active_provider)

@@ -17,6 +17,10 @@ export function activeLlmModelId(settings?: LLMSettings): string | undefined {
       return settings.lmstudioModel?.trim() || undefined;
     case 'openrouter':
       return settings.openrouterModel?.trim() || undefined;
+    case 'claude_code':
+      return settings.claudeCodeModel?.trim() || 'sonnet';
+    case 'codex':
+      return settings.codexModel?.trim() || 'codex default';
     default:
       return undefined;
   }
@@ -36,6 +40,8 @@ export function activeLlmProviderLabel(settings?: LLMSettings): string {
     claude: 'Claude',
     lmstudio: 'LM Studio',
     openrouter: 'OpenRouter',
+    claude_code: 'Claude Code',
+    codex: 'Codex',
   };
   return labels[p] ?? p;
 }
