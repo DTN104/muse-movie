@@ -57,6 +57,7 @@ function parseAttachments(raw: unknown): McpAttachmentPayload[] | undefined {
 
 export async function POST(req: NextRequest) {
   let lastUser: McpChatMessage | undefined;
+  let sessionId = '';
   try {
     const body = (await req.json()) as {
       sessionId?: string;
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
       };
     };
 
-    const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
+    sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
     const sessionContext = body.sessionContext;
 
     if (body.executeTool && typeof body.executeTool.capability === 'string') {

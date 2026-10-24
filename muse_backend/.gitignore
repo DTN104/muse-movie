@@ -2,9 +2,6 @@
 .env
 .env.*
 !.env.example
-# Meta Muse account session cookies
-.muse-state/
-
 # Python
 __pycache__/
 *.py[cod]

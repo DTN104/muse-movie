@@ -21,6 +21,7 @@ from app.providers.base import (
     LLMProvider,
 )
 from app.providers.image.flux_klein_provider import FluxKleinProvider
+from app.providers.image.kaggle_sdxl_provider import KaggleSdxlProvider
 from app.providers.video.local.wan_provider import WanProvider
 from app.providers.video.api.kling_provider import KlingProvider
 from app.providers.video.api.seeddance_provider import SeedDanceProvider
@@ -31,12 +32,15 @@ from app.providers.llm.ollama_provider import OllamaProvider
 from app.providers.llm.claude_provider import ClaudeProvider
 from app.providers.llm.lmstudio_provider import LMStudioProvider
 from app.providers.llm.openrouter_provider import OpenRouterProvider
+from app.providers.llm.cli_providers import ClaudeCodeProvider, CodexProvider
 
 
 # ── Provider registries ───────────────────────────────────────────────────────
 
 IMAGE_DRAFT_PROVIDERS: dict[str, Type[ImageDraftProvider]] = {
     "flux_klein": FluxKleinProvider,        # text2image / reference2image, FLUX.2-klein 9B
+    # Free Kaggle GPU via ../kaggle-image-gen/run.sh (SDXL / Juggernaut XL, no content filter, slow)
+    "kaggle_sdxl": KaggleSdxlProvider,
     # Add new image draft providers here, e.g.:
     # "sdxl": SDXLProvider,
 }
@@ -61,6 +65,9 @@ LLM_PROVIDERS: dict[str, Type[LLMProvider]] = {
     "claude": ClaudeProvider,
     "lmstudio": LMStudioProvider,
     "openrouter": OpenRouterProvider,
+    # Subscription CLIs (no API key) — run the locally installed, signed-in CLI headless
+    "claude_code": ClaudeCodeProvider,
+    "codex": CodexProvider,
 }
 
 

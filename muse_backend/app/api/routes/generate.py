@@ -6,8 +6,10 @@ POST /generate/* — Core inference endpoints.
   POST /generate/video     → Motion Muse (async job, returns job_id)
   POST /generate/story     → Story Muse (streaming SSE response)
   POST /generate/comfyui   → ComfyUI (async job, returns job_id)
+  POST /generate/keyframe  → Keyframe image via image-draft provider (async job, returns job_id)
 """
 
+import inspect
 import json
 import os
 import re
@@ -19,6 +21,7 @@ from typing import Any, AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 from app.schemas import (
     VideoGenerateRequest,
@@ -27,6 +30,7 @@ from app.schemas import (
     JobStatus,
 )
 from app.registry import (
+    get_image_draft_provider,
     get_video_provider,
     get_llm_provider,
 )
@@ -181,6 +185,88 @@ async def generate_video(request: VideoGenerateRequest, background_tasks: Backgr
 
 
 # ── ComfyUI — Generic workflow execution (async job) ──────────────────────────
+
+
+class KeyframeGenerateRequest(BaseModel):
+    scene_id: str = Field(..., min_length=1, max_length=64)
+    prompt: str = Field(..., min_length=1, max_length=4000)
+    provider_id: str = Field(..., min_length=1, max_length=64)
+    aspect_ratio: str | None = Field(default=None, max_length=8)
+    model: str | None = Field(default=None, max_length=32)
+
+
+@router.post("/keyframe", response_model=VideoGenerateResponse)
+async def generate_keyframe(request: KeyframeGenerateRequest, background_tasks: BackgroundTasks):
+    """
+    Keyframe image via a registered image-draft provider, tracked as a background job
+    (slow providers such as Kaggle take minutes). Poll GET /jobs/{job_id}; output_path is
+    relative to outputs/.
+    """
+    try:
+        provider = get_image_draft_provider(request.provider_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if not provider.is_available():
+        raise HTTPException(
+            status_code=503,
+            detail={"error": f"Provider '{provider.provider_id}' is not available.", "reason": provider.unavailable_reason()},
+        )
+
+    job_id = f"job_{uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc).isoformat()
+    _jobs[job_id] = {
+        "job_id": job_id,
+        "scene_id": request.scene_id,
+        "provider_id": provider.provider_id,
+        "status": JobStatus.QUEUED,
+        "progress_percent": 0,
+        "message": "Job queued",
+        "output_path": None,
+        "error": None,
+        "created_at": now,
+        "updated_at": now,
+        "comfy_prompt_id": None,
+    }
+    params: dict[str, Any] = {}
+    if request.aspect_ratio:
+        params["aspect_ratio"] = request.aspect_ratio
+    if request.model:
+        params["model"] = request.model
+
+    async def _run_job():
+        job = _jobs[job_id]
+        job["status"] = JobStatus.RUNNING
+        job["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        async def on_progress(percent: int, message: str):
+            job["progress_percent"] = percent
+            job["message"] = message
+            job["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        try:
+            if "on_progress" in inspect.signature(provider.generate).parameters:
+                result = await provider.generate(request.prompt, [], params, on_progress=on_progress)
+            else:
+                result = await provider.generate(request.prompt, [], params)
+        except Exception as exc:  # noqa: BLE001
+            job["status"] = JobStatus.FAILED
+            job["error"] = str(exc)
+            return
+
+        job["updated_at"] = datetime.now(timezone.utc).isoformat()
+        if result.success and result.output_paths:
+            job["status"] = JobStatus.COMPLETED
+            job["output_path"] = result.output_paths[0]
+            job["progress_percent"] = 100
+            job["message"] = "Generation complete"
+        else:
+            job["status"] = JobStatus.FAILED
+            job["error"] = result.error or "No image returned"
+
+    background_tasks.add_task(_run_job)
+    return VideoGenerateResponse(
+        job_id=job_id, scene_id=request.scene_id, provider_id=provider.provider_id, status=JobStatus.QUEUED
+    )
 
 
 @router.post("/comfyui")

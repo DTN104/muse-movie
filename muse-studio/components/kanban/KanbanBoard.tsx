@@ -19,6 +19,7 @@ import { VideoReviewDialog } from './VideoReviewDialog';
 import { FinalSceneDialog } from './FinalSceneDialog';
 import { ComfyWorkflowSelectDialog } from './ComfyWorkflowSelectDialog';
 import { ComfyGenerateDialog } from './ComfyGenerateDialog';
+import { KaggleKeyframeDialog } from './KaggleKeyframeDialog';
 import { KANBAN_COLUMNS } from '@/lib/constants';
 import {
   updateScene,
@@ -60,13 +61,26 @@ export function KanbanBoard({
     setActiveMuse(deriveActiveMuse(scenes));
   }, [scenes, setActiveMuse]);
 
-  // On first mount, revert any GENERATING scenes that have no tracked job.
+  // On first mount, resume polling for jobs tracked before a page reload; only
+  // GENERATING scenes with no tracked job at all are reverted.
   useEffect(() => {
     if (mountedRef.current) return;
     mountedRef.current = true;
 
+    let stored: Record<string, string> = {};
+    try {
+      stored = JSON.parse(localStorage.getItem(`muse.pendingJobs.${projectId}`) ?? '{}');
+    } catch {
+      stored = {};
+    }
+    const tracked: Record<string, string> = {};
+    for (const s of scenes) {
+      if (s.status === 'GENERATING' && stored[s.id]) tracked[s.id] = stored[s.id];
+    }
+    if (Object.keys(tracked).length > 0) setPendingJobs(tracked);
+
     const orphans = scenes.filter(
-      (s) => s.status === 'GENERATING' && !pendingJobs[s.id],
+      (s) => s.status === 'GENERATING' && !tracked[s.id],
     );
     if (orphans.length === 0) return;
 
@@ -75,14 +89,14 @@ export function KanbanBoard({
     });
     setScenes((prev) =>
       prev.map((s) =>
-        s.status === 'GENERATING' && !pendingJobs[s.id]
+        s.status === 'GENERATING' && !tracked[s.id]
           ? { ...s, status: 'DRAFT_QUEUE' as KanbanStatus, updatedAt: new Date() }
           : s,
       ),
     );
     if (orphans.length > 0) {
       toast('Generation jobs reset', {
-        description: `${orphans.length} scene(s) moved back to Video Draft Queue — backend was restarted.`,
+        description: `${orphans.length} scene(s) moved back to Video Draft Queue — no job is tracked for them.`,
         duration: 6000,
       });
     }
@@ -111,8 +125,28 @@ export function KanbanBoard({
   const [comfyGenerateKind, setComfyGenerateKind] = useState<'image' | 'video' | null>(null);
   const [comfyGenerateWorkflowId, setComfyGenerateWorkflowId] = useState<string | null>(null);
 
+  const [kaggleKeyframeScene, setKaggleKeyframeScene] = useState<Scene | null>(null);
+  const [kaggleAvailable, setKaggleAvailable] = useState(false);
+  useEffect(() => {
+    fetch('/api/providers', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setKaggleAvailable(
+        Array.isArray(d?.image_draft) && d.image_draft.some(
+          (provider: { provider_id?: string; is_available?: boolean }) =>
+            provider.provider_id === 'kaggle_sdxl' && provider.is_available === true,
+        ),
+      ))
+      .catch(() => setKaggleAvailable(false));
+  }, []);
+
   // sceneId → jobId for background polling of GENERATING scenes
   const [pendingJobs, setPendingJobs] = useState<Record<string, string>>({});
+
+  // Keep tracked jobs across page reloads (the backend keeps running them).
+  useEffect(() => {
+    if (!mountedRef.current) return;
+    localStorage.setItem(`muse.pendingJobs.${projectId}`, JSON.stringify(pendingJobs));
+  }, [pendingJobs, projectId]);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(false);
 
@@ -243,6 +277,11 @@ export function KanbanBoard({
     if (scene && scene.status === 'GENERATING') return;
 
     const overId = over.id as KanbanStatus;
+    // GENERATING is set only by a real job; a dragged-in card would spin forever.
+    if (overId === 'GENERATING') {
+      toast('Use Create Video to start generation', { duration: 4000 });
+      return;
+    }
     const isColumnTarget = KANBAN_COLUMNS.some((c) => c.id === overId);
 
     if (isColumnTarget && active.id !== overId) {
@@ -270,6 +309,10 @@ export function KanbanBoard({
   }
 
   function handleOpenKeyframePanel(scene: Scene) {
+    if (kaggleAvailable) {
+      setKaggleKeyframeScene(scene);
+      return;
+    }
     if (scene.comfyImageWorkflowId) {
       openComfyGenerate(scene, 'image', scene.comfyImageWorkflowId);
     } else {
@@ -528,6 +571,21 @@ export function KanbanBoard({
           setComfySelectKind(null);
           openComfyGenerate(targetScene, kind, workflow.id);
         }}
+      />
+
+      <KaggleKeyframeDialog
+        open={kaggleKeyframeScene !== null}
+        scene={kaggleKeyframeScene}
+        onClose={() => setKaggleKeyframeScene(null)}
+        onKeyframeSaved={(sceneId, keyframe) =>
+          setScenes((prev) =>
+            prev.map((s) =>
+              s.id === sceneId
+                ? { ...s, status: 'KEYFRAME' as KanbanStatus, keyframes: [...s.keyframes, keyframe], updatedAt: new Date() }
+                : s,
+            ),
+          )
+        }
       />
 
       {/* ComfyUI dynamic generation dialog */}

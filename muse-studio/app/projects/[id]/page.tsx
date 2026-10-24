@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { deriveProjectStage } from '@/lib/derive-project-stage';
 import { listCharacters } from '@/lib/actions/characters';
 import { ProjectCharactersButton } from '@/components/characters/ProjectCharactersButton';
+import { JobLogPanel } from '@/components/kanban/JobLogPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,6 +137,7 @@ export default async function ProjectKanbanPage({ params, searchParams }: PagePr
           projectId={id}
           projectTitle={project.title}
         />
+        <JobLogPanel />
 
         {/* Export Full Film (when all scenes final) or Storyline badge */}
         <div className="ml-auto">
